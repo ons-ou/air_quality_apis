@@ -42,8 +42,10 @@ def filter_by_date_state_county(query, pollutant_model, month, year, state = Non
             .filter(State.state_name == state)
 
     if county:
-        query = query.join(County, pollutant_model.state_code == County.county_code & County.county_code == pollutant_model.county_code) \
-            .filter(County.county_name == county)
+        query = query.join(County, and_(
+        pollutant_model.state_code == County.state_code,
+        pollutant_model.county_code == County.county_code
+    )).filter(County.county_name == county)
     return query
 
 
@@ -57,6 +59,7 @@ def get_average_value(element, year, month, state, county):
     query = query.with_entities(func.avg(column))
 
     average_value = query.scalar()
+    print(query)
     return average_value
 
 
