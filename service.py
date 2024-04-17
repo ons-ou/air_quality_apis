@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import func, and_
 
 from models.AQI import AQI
 from models.County import County
@@ -27,23 +27,27 @@ def get_column_By_Attribute(pollutant_model, attribute):
     return getattr(pollutant_model, attribute)
 
 
-def filter_by_date_state_county(query, pollutant_model, month, year, state, county):
+def filter_by_date_state_county(query, pollutant_model, month, year, state = None, county = None):
     query = query.filter(
         func.extract('year', pollutant_model.date_local) == year,
-        func.extract('month', pollutant_model.date_local) == month
     )
+
+    if month:
+        query = query.filter(
+            func.extract('month', pollutant_model.date_local) == month
+        )
 
     if state:
         query = query.join(State, State.state_code == pollutant_model.state_code) \
             .filter(State.state_name == state)
 
     if county:
-        query = query.join(County) \
+        query = query.join(County, pollutant_model.state_code == County.county_code & County.county_code == pollutant_model.county_code) \
             .filter(County.county_name == county)
     return query
 
 
-def get_average_value(element, year, month, state, county, attribute='aqi'):
+def get_average_value(element, year, month, state, county):
     pollutant_model = get_table(element)
     if not pollutant_model:
         return None
@@ -56,14 +60,24 @@ def get_average_value(element, year, month, state, county, attribute='aqi'):
     return average_value
 
 
-def get_row_count(element, year, month, state, county, attribute):
+def get_row_count(element, year, month, state, county):
     pollutant_model = get_table(element)
     if not pollutant_model:
         return None
 
-    column = get_column_By_Attribute(pollutant_model, attribute)
     query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state, county)
-    query = query.with_entities(func.count(column))
+    query = query.with_entities(func.count("date_local"))
+    row_count = query.scalar()
+    return row_count
+
+
+def get_obs_count(element, year, month, state, county):
+    pollutant_model = get_table(element)
+    if not pollutant_model:
+        return None
+
+    query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state, county)
+    query = query.with_entities(func.sum(pollutant_model.observation_count))
     row_count = query.scalar()
     return row_count
 
@@ -99,7 +113,17 @@ def transform_to_day(dates):
     return transformed_dates
 
 
-def average_value_by_day(element, year, month, state, county, attribute='aqi'):
+def average_value_by_day(element, year, month, state, county):
+    days = {
+        0: "Monday",
+        1: "Tuesday",
+        2: "Wednesday",
+        3: "Thursday",
+        4: "Friday",
+        5: "Saturday",
+        6: "Sunday"
+    }
+
     pollutant_model = get_table(element)
     if not pollutant_model:
         return None
@@ -107,78 +131,97 @@ def average_value_by_day(element, year, month, state, county, attribute='aqi'):
     column = get_column(pollutant_model, element)
     query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state, county)
 
-    # Group data by day and calculate the average value for each day
-    query = query.with_entities(func.TO_CHAR(pollutant_model.date_local, 'YYYY-MM-DD').label('day'),
-                                func.avg(column).label('average_value')) \
-        .group_by(func.TO_CHAR(pollutant_model.date_local, 'YYYY-MM-DD'))
-
-    # Execute the query
-    results = query.all()
-
-    # Convert the query results to a list of dictionaries
-    average_values_by_day = [{'time': result[0], 'value': result[1]} for result in results]
-
-    # Transform the dates to days of the week
-    transformed_dates = transform_to_day(average_values_by_day)
-
-    return transformed_dates
-
-
-def calculate_season_from_date(month):
-    seasons = {
-        1: 'Winter',
-        2: 'Winter',
-        3: 'Spring',
-        4: 'Spring',
-        5: 'Spring',
-        6: 'Summer',
-        7: 'Summer',
-        8: 'Summer',
-        9: 'Fall',
-        10: 'Fall',
-        11: 'Fall',
-        12: 'Winter'
-    }
-    return seasons.get(int(month))
-
-
-def calculate_avg_value_by_season(element, year, month, state, county, attribute='aqi'):
-    pollutant_model = get_table(element)
-    if not pollutant_model:
-        return None
-
-    column = get_column(pollutant_model, element)
-    query = pollutant_model.query.filter(
-        func.extract('year', pollutant_model.date_local) == year
-    )
-
-    if state:
-        query = query.join(State, State.state_code == pollutant_model.state_code) \
-            .filter(State.state_name == state)
-
-    if county:
-        query = query.join(County) \
-            .filter(County.county_name == county)
-
-    query = query.with_entities(
-        func.TO_CHAR(pollutant_model.date_local, 'MM').label('month'),
-        func.avg(column).label('average_value')
-    ).group_by(func.TO_CHAR(pollutant_model.date_local, 'MM'))
-
-    results = query.all()
-    print(results)
-    average_values = [{'season': calculate_season_from_date(result.month), 'average_value': float(result.average_value)}
-                      for result in results]
-    print(average_values)
+    query = query.with_entities(pollutant_model.day_of_week, func.avg(column).label('value')).group_by(pollutant_model.day_of_week)
+    result = query.all()
+    result.sort(key=lambda x: x[0])
+    # Convert the result to a dictionary for easier processing
+    average_values = [{'label': days[row[0]], 'value': row[1]} for row in result]
     return average_values
 
 
-def count_days_with_max_hour(element, year, month, state, county, first_max_hour, attribute='aqi'):
+def calculate_avg_value_by_season(element, year, state, county):
     pollutant_model = get_table(element)
     if not pollutant_model:
         return None
-    query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state, county)
-    query = query.filter(pollutant_model.first_max_hour == first_max_hour)
-    distinct_dates_count = query.with_entities(func.count(func.distinct(pollutant_model.date_local))).scalar()
 
-    return distinct_dates_count
+    column = get_column(pollutant_model, element)
+    query = filter_by_date_state_county(pollutant_model.query, pollutant_model, None, year, state, county)
+
+    query = query.with_entities(pollutant_model.season, func.avg(column).label('value')).group_by(pollutant_model.season)
+    result = query.all()
+    result.sort(key=lambda x: x[0])
+    # Convert the result to a dictionary for easier processing
+    average_values = [{'season': row[0], 'value': row[1]} for row in result]
+    return average_values
+
+
+def count_days_with_max_hour(element, year, month, state, county):
+    pollutant_model = get_table(element)
+    if not pollutant_model:
+        return None
+
+    query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state, county)
+
+    query = query.with_entities(pollutant_model.first_max_hour, func.count(pollutant_model.first_max_hour).label('value')).group_by(pollutant_model.first_max_hour)
+    result = query.all()
+    result.sort(key=lambda x: x[0])
+
+    # Convert the label values to 12-hour format with AM/PM
+    def format_hour(hour):
+        if hour == 0:
+            return '12AM'
+        elif hour < 12:
+            return f'{hour}AM'
+        elif hour == 12:
+            return '12PM'
+        else:
+            return f'{hour - 12}PM'
+
+    # Convert the result to a dictionary with formatted hour labels
+    average_values = [{'label': format_hour(row[0]), 'value': row[1]} for row in result]
+    return average_values
+
+
+def avg_value_by_state(element, year, month):
+    pollutant_model = get_table(element)
+    if not pollutant_model:
+        return None
+
+    query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year)
+    column = get_column(pollutant_model, element)
+
+    # Join with the states table to get the state name
+    query = query.join(State, State.state_code == pollutant_model.state_code)
+
+    # Assuming the pollutant_model has a 'value' column and the states_table has a 'state_name' column
+    query = query.with_entities(State.state_name, func.avg(column).label('avg_value')).group_by(
+        State.state_name)
+    result = query.all()
+
+    # Convert the result to a list of dictionaries
+    average_values = [{'name': row[0], 'value': row[1]} for row in result]
+    return average_values
+
+
+def avg_value_by_county(element, year, month, state):
+    pollutant_model = get_table(element)
+    if not pollutant_model:
+        return None
+
+    query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state)
+    column = get_column(pollutant_model, element)
+
+    # Join with the states table to get the state name
+    query = query.join(County, and_(
+        pollutant_model.state_code == County.state_code,
+        pollutant_model.county_code == County.county_code
+    ))
+
+    # Assuming the pollutant_model has a 'value' column and the states_table has a 'state_name' column
+    query = query.with_entities(County.county_name, func.avg(column).label('avg_value')).group_by(
+        County.county_name)
+    result = query.all()
+
+    # Convert the result to a list of dictionaries
+    average_values = [{'name': row[0], 'value': row[1]} for row in result]
+    return average_values

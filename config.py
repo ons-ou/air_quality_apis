@@ -3,6 +3,7 @@ import os
 from flask import Flask
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 
 # Connect to the database
 DB_HOST = os.getenv('DB_HOST', '127.0.0.1:5432')
@@ -23,6 +24,7 @@ DEBUG = True
 # ----------------------------------------------------------------------------#
 
 app = Flask(__name__)
+CORS(app)
 moment = Moment(app)
 app.config.from_object('config')
 db = SQLAlchemy(app)
