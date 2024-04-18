@@ -27,7 +27,7 @@ def get_column_By_Attribute(pollutant_model, attribute):
     return getattr(pollutant_model, attribute)
 
 
-def filter_by_date_state_county(query, pollutant_model, month, year, state = None, county = None):
+def filter_by_date_state_county(query, pollutant_model, month, year, state=None, county=None):
     query = query.filter(
         func.extract('year', pollutant_model.date_local) == year,
     )
@@ -43,9 +43,9 @@ def filter_by_date_state_county(query, pollutant_model, month, year, state = Non
 
     if county:
         query = query.join(County, and_(
-        pollutant_model.state_code == County.state_code,
-        pollutant_model.county_code == County.county_code
-    )).filter(County.county_name == county)
+            pollutant_model.state_code == County.state_code,
+            pollutant_model.county_code == County.county_code
+        )).filter(County.county_name == county)
     return query
 
 
@@ -134,7 +134,8 @@ def average_value_by_day(element, year, month, state, county):
     column = get_column(pollutant_model, element)
     query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state, county)
 
-    query = query.with_entities(pollutant_model.day_of_week, func.avg(column).label('value')).group_by(pollutant_model.day_of_week)
+    query = query.with_entities(pollutant_model.day_of_week, func.avg(column).label('value')).group_by(
+        pollutant_model.day_of_week)
     result = query.all()
     result.sort(key=lambda x: x[0])
     # Convert the result to a dictionary for easier processing
@@ -150,7 +151,8 @@ def calculate_avg_value_by_season(element, year, state, county):
     column = get_column(pollutant_model, element)
     query = filter_by_date_state_county(pollutant_model.query, pollutant_model, None, year, state, county)
 
-    query = query.with_entities(pollutant_model.season, func.avg(column).label('value')).group_by(pollutant_model.season)
+    query = query.with_entities(pollutant_model.season, func.avg(column).label('value')).group_by(
+        pollutant_model.season)
     result = query.all()
     result.sort(key=lambda x: x[0])
     # Convert the result to a dictionary for easier processing
@@ -165,7 +167,9 @@ def count_days_with_max_hour(element, year, month, state, county):
 
     query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state, county)
 
-    query = query.with_entities(pollutant_model.first_max_hour, func.count(pollutant_model.first_max_hour).label('value')).group_by(pollutant_model.first_max_hour)
+    query = query.with_entities(pollutant_model.first_max_hour,
+                                func.count(pollutant_model.first_max_hour).label('value')).group_by(
+        pollutant_model.first_max_hour)
     result = query.all()
     result.sort(key=lambda x: x[0])
 
@@ -228,3 +232,50 @@ def avg_value_by_county(element, year, month, state):
     # Convert the result to a list of dictionaries
     average_values = [{'name': row[0], 'value': row[1]} for row in result]
     return average_values
+
+
+def get_aqi_levels_info(element, year, month, state, county):
+    pollutant_model = get_table(element)
+    if not pollutant_model:
+        return None
+
+    query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state, county)
+
+    query = query.with_entities(pollutant_model.aqi)
+
+    results = query.all()
+
+    aqi_levels = {'Good': 0, 'Moderate': 0, 'Unhealthy for Sensitive Groups': 0, 'Unhealthy': 0, 'Hazardous': 0}
+    for result in results:
+        aqi = result[0]
+        if aqi <= 50:
+            aqi_levels['Good'] += 1
+        elif 51 <= aqi <= 100:
+            aqi_levels['Moderate'] += 1
+        elif 101 <= aqi <= 150:
+            aqi_levels['Unhealthy for Sensitive Groups'] += 1
+        elif 151 <= aqi <= 200:
+            aqi_levels['Unhealthy'] += 1
+        else:
+            aqi_levels['Hazardous'] += 1
+
+    table_format = [
+        {'name': 'Good', 'value': aqi_levels['Good']},
+        {'name': 'Moderate', 'value': aqi_levels['Moderate']},
+        {'name': 'Unhealthy for Sensitive Groups', 'value': aqi_levels['Unhealthy for Sensitive Groups']},
+        {'name': 'Unhealthy', 'value': aqi_levels['Unhealthy']},
+        {'name': 'Hazardous', 'value': aqi_levels['Hazardous']}
+    ]
+
+    return table_format
+
+
+def get_pollution_elements_info(year, month, state, county):
+    elements = ['NO2', 'SO2', 'CO', 'PM10']
+    pollution_info = []
+
+    for element in elements:
+        avg_value = get_average_value(element, year, month, state, county)
+        pollution_info.append({'name': element, 'value': avg_value})
+
+    return pollution_info

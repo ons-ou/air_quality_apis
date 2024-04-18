@@ -2,7 +2,8 @@ from flask import request, jsonify
 
 from config import app
 from service import get_average_value, get_row_count, average_value_by_day, calculate_avg_value_by_season, \
-    count_days_with_max_hour, get_obs_count, avg_value_by_state, avg_value_by_county
+    count_days_with_max_hour, get_obs_count, avg_value_by_state, avg_value_by_county, get_aqi_levels_info, \
+    get_pollution_elements_info
 
 
 def get_request_parameters():
@@ -104,6 +105,28 @@ def avg_by_state():
 def avg_by_county():
     element, year, month, state, _ = get_request_parameters()
     average_values = avg_value_by_county(element, year, month, state)
+
+    if average_values is None:
+        return jsonify({'error': 'Invalid element or no data found'}), 400
+
+    return jsonify(average_values)
+
+
+@app.route('/air_quality_category', methods=['GET'])
+def air_quality_category():
+    element, year, month, state, county = get_request_parameters()
+    average_values = get_aqi_levels_info(element, year, month, state, county)
+
+    if average_values is None:
+        return jsonify({'error': 'Invalid element or no data found'}), 400
+
+    return jsonify(average_values)
+
+
+@app.route('/air_quality_comparaison', methods=['GET'])
+def air_quality_comparison():
+    element, year, month, state, county = get_request_parameters()
+    average_values = get_pollution_elements_info(year, month, state, county)
 
     if average_values is None:
         return jsonify({'error': 'Invalid element or no data found'}), 400
