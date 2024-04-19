@@ -59,7 +59,6 @@ def get_average_value(element, year, month, state, county):
     query = query.with_entities(func.avg(column))
 
     average_value = query.scalar()
-    print(query)
     return average_value
 
 
@@ -234,38 +233,23 @@ def avg_value_by_county(element, year, month, state):
     return average_values
 
 
-def get_aqi_levels_info(element, year, month, state, county):
+def get_concern_levels_info(element, year, month, state, county):
     pollutant_model = get_table(element)
     if not pollutant_model:
         return None
 
+    column = get_column(pollutant_model, element)
     query = filter_by_date_state_county(pollutant_model.query, pollutant_model, month, year, state, county)
 
-    query = query.with_entities(pollutant_model.aqi)
+    category_column = pollutant_model.category  # Assuming the column name is 'category'
+    query = query.with_entities(column, category_column, pollutant_model)
+
+    # Group by category and count occurrences
+    query = query.group_by(category_column).with_entities(category_column, func.count().label('count'))
 
     results = query.all()
 
-    aqi_levels = {'Good': 0, 'Moderate': 0, 'Unhealthy for Sensitive Groups': 0, 'Unhealthy': 0, 'Hazardous': 0}
-    for result in results:
-        aqi = result[0]
-        if aqi <= 50:
-            aqi_levels['Good'] += 1
-        elif 51 <= aqi <= 100:
-            aqi_levels['Moderate'] += 1
-        elif 101 <= aqi <= 150:
-            aqi_levels['Unhealthy for Sensitive Groups'] += 1
-        elif 151 <= aqi <= 200:
-            aqi_levels['Unhealthy'] += 1
-        else:
-            aqi_levels['Hazardous'] += 1
-
-    table_format = [
-        {'name': 'Good', 'value': aqi_levels['Good']},
-        {'name': 'Moderate', 'value': aqi_levels['Moderate']},
-        {'name': 'Unhealthy for Sensitive Groups', 'value': aqi_levels['Unhealthy for Sensitive Groups']},
-        {'name': 'Unhealthy', 'value': aqi_levels['Unhealthy']},
-        {'name': 'Hazardous', 'value': aqi_levels['Hazardous']}
-    ]
+    table_format = [{'name': category, 'value': count} for category, count in results if count !=0]
 
     return table_format
 

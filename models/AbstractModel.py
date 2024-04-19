@@ -14,5 +14,6 @@ class AbstractModel(Base):
     observation_count = Column(Integer)
     state_code = Column(String(2), ForeignKey('counties.state_code'))
     county_code = Column(String(3), ForeignKey('counties.county_code'))
-    season = Column(String(255))
+    season = Column(String(6))
+    category = Column(String(30))
     day_of_week = Column(Integer)
