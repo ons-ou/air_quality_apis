@@ -98,7 +98,7 @@ def get_average_value_by_hour(element, year, month, state, county):
 
     results = query.all()
 
-    average_values_by_hour = [{'hour': result[0], 'average_value': result[1]} for result in results]
+    average_values_by_hour = [{'name': result[0], 'average_value': result[1]} for result in results]
 
     return average_values_by_hour
 
@@ -110,7 +110,7 @@ def transform_to_day(dates):
 
         day_of_week = date_obj.strftime('%A')
 
-        transformed_dates.append({'day': day_of_week, 'value': date_entry['value']})
+        transformed_dates.append({'name': day_of_week, 'value': date_entry['value']})
 
     return transformed_dates
 
@@ -138,7 +138,7 @@ def average_value_by_day(element, year, month, state, county):
     result = query.all()
     result.sort(key=lambda x: x[0])
     # Convert the result to a dictionary for easier processing
-    average_values = [{'label': days[row[0]], 'value': row[1]} for row in result]
+    average_values = [{'name': days[row[0]], 'value': row[1]} for row in result]
     return average_values
 
 
@@ -155,7 +155,7 @@ def calculate_avg_value_by_season(element, year, state, county):
     result = query.all()
     result.sort(key=lambda x: x[0])
     # Convert the result to a dictionary for easier processing
-    average_values = [{'season': row[0], 'value': row[1]} for row in result]
+    average_values = [{'name': row[0], 'value': row[1]} for row in result]
     return average_values
 
 
@@ -184,7 +184,7 @@ def count_days_with_max_hour(element, year, month, state, county):
             return f'{hour - 12}PM'
 
     # Convert the result to a dictionary with formatted hour labels
-    average_values = [{'label': format_hour(row[0]), 'value': row[1]} for row in result]
+    average_values = [{'name': format_hour(row[0]), 'value': row[1]} for row in result]
     return average_values
 
 
