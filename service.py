@@ -255,11 +255,30 @@ def get_concern_levels_info(element, year, month, state, county):
 
 
 def get_pollution_elements_info(year, month, state, county):
-    elements = ['NO2', 'SO2', 'CO', 'PM10']
+    elements = ['NO2', 'SO2', 'CO', 'PM10', 'PM2.5', 'Ozone']
     pollution_info = []
+
+    def normalize_value(value, pollutant):
+        # Define typical ranges for each pollutant
+        ranges = {
+            'NO2': (0, 1250),  # Example ranges, adjust as needed
+            'SO2': (0, 605),
+            'CO': (0, 400),
+            'PM10': (0, 250),
+            'PM2.5': (0, 425),
+            'Ozone': (0, 0.2)
+        }
+
+        # Get the range for the pollutant
+        min_range, max_range = ranges.get(pollutant, (0, 100))
+        value = float(value)
+        # Normalize the value to the range [0, 100]
+        normalized_value = (value - min_range) / (max_range - min_range) * 100
+        return normalized_value
 
     for element in elements:
         avg_value = get_average_value(element, year, month, state, county)
-        pollution_info.append({'name': element, 'value': avg_value})
+        if avg_value is not None:
+            pollution_info.append({'name': element, 'value': normalize_value(avg_value, element)})
 
     return pollution_info

@@ -1,9 +1,12 @@
 import os
 
+from dotenv import load_dotenv
 from flask import Flask
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+
+load_dotenv()
 
 # Connect to the database
 DB_HOST = os.getenv('DB_HOST', '127.0.0.1:5432')
