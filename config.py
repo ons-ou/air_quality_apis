@@ -6,13 +6,17 @@ from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
-load_dotenv()
-
-# Connect to the database
-DB_HOST = os.getenv('DB_HOST', '127.0.0.1:5432')
-DB_USER = os.getenv('DB_USER', 'postgres')
-DB_PASSWORD = os.getenv('DB_PASSWORD', '0000')
-DB_NAME = os.getenv('DB_NAME', 'air_quality')
+if 'DB_NAME' in os.environ:
+    # Connect to the database
+    DB_HOST = os.getenv('DB_HOST', 'emissions.cbs60caayciy.us-east-2.rds.amazonaws.com')
+    DB_USER = os.getenv('DB_USER', 'postgres')
+    DB_PASSWORD = os.getenv('DB_PASSWORD', 'Morgan$12345')
+    DB_NAME = os.getenv('DB_NAME', 'air_quality')
+else:
+    DB_HOST = 'emissions.cbs60caayciy.us-east-2.rds.amazonaws.com'
+    DB_USER = 'postgres'
+    DB_PASSWORD = 'Morgan$12345'
+    DB_NAME = 'air_quality'
 
 DB_PATH = 'postgresql+psycopg2://{}:{}@{}/{}'.format(DB_USER, DB_PASSWORD, DB_HOST, DB_NAME)
 
